@@ -49,8 +49,8 @@ function isFunction(functionToCheck) {
   return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
 }
 
-class tools {
-  constructor(FB_ACCESS_TOKEN, event) {
+class Tools {
+  constructor (FB_ACCESS_TOKEN, event) {
     this.FB_ACCESS_TOKEN = FB_ACCESS_TOKEN;
     this.event = event;
   }
@@ -79,64 +79,126 @@ class tools {
          }
      });
    }
-}
 
+   buttonTemplate(text, buttons, callback) {
+     request({
+         url: 'https://graph.facebook.com/v2.6/me/messages',
+         qs: {access_token: this.FB_ACCESS_TOKEN},
+         method: 'POST',
+         json: {
+             recipient: { id: this.event.sender.id },
+             message: {
+               attachment : {
+                "type":"template",
+                "payload":{
+                  "template_type":"button",
+                  "text":text,
+                  "buttons":buttons
+                }
+              }
+            }
+          }
+     }, function (error, response, body) {
+         if (error) {
+             console.log('Error sending message: ', error);
+         } else if (response.body.error) {
+             console.log('Error: ', response.body.error);
+         } else {
+           if(callback && isFunction(callback)) {
+             callback();
+           }
+         }
+     });
+   }
+
+}
 
 var triggerPayload = {};
 
-var askForPic = function(event) {
-  request({
-      url: 'https://graph.facebook.com/v2.6/me/messages',
-      qs: {access_token: 'EAABvjrWKCeMBAA5Di9rOmargy1561JqEY6mhCPPiO2kLw82O52LZAAIFbUKaM6ZAiuneVE3z8EIzU6dgWYdqsQNhBFCFIJLCZCcvYNvs42apkPsyJcOjFhXWI0ngRA8QgOxWvsGXN032XB6xKdtY8mbru9zZAwVFdnFZAW1cZC64yD2EuHHkOt'},
-      method: 'POST',
-      json: {
-          recipient: { id: event.sender.id },
-          message: {
-            text: "moj tekst jak siemasz"
-          },
-      }
-  }, function (error, response, body) {
-      if (error) {
-          console.log('Error sending message: ', error);
-      } else if (response.body.error) {
-          console.log('Error: ', response.body.error);
-      }
-  });
+var askForPic = function(tools) {
+  tools.buttonTemplate('xdd', [{
+    type: "postback",
+    title: "Muj mały btn",
+    payload: "USER_TWUJ_PAYLOAD"
+  }])
+}
+ var CoChceszZrobic = function(tools) {
+
+ }
+
+var def = function(tools) {
+  // console.log(event);
+    tools.sendText('Cześć tu Hooku! Jesteś w Warszawie i widziłeś coś ciekawego? Prześlij zdjęcie, by dowiedzieć się coto jest! :)bla bla', [], function() {
+      tools.sendText('Co chcesz zrobić?', [{
+         "content_type": "text",
+         "title": "Wyślij zdjęcie",
+         "payload":'USER_PAYLOAD_PHOTO'
+      },{
+        "content_type":"text",
+        "title":"Mój ranking",
+        "payload":'USER_MUJ_PAYLOAD'
+      },{
+        "content_type":"location"
+      }])
+    });
 }
 
-var def = function(event) {
-  console.log(event);
+var ConvertUrlIntoBase64 = function(imgUrl) {
 
 }
 
-triggerPayload['USER_MUJ_PAYLOAD'] = function(e) { askForPic(e); }
+var afterImageSend = function() {
+
+}
+
+//tools.event.message.attachments[0].url adres obrazka
+
+triggerPayload['USER_MUJ_PAYLOAD'] = function(t) { askForPic(t); }
+//triggerPayload['USER_PAYLOAD_PHOT'] = function(t) { sobiefajnafunkcja(t); }
 triggerPayload['default'] = function(e) { def(e); }
-
+// triggerPayload['USER_JAKIS_PAYLOAD'] =
 app.post('/webhook', function(req, res) {
-
+  console.log(req);
     for (var jj = 0; jj < req.body.entry.length;jj++) {
 
         var messaging_events = req.body.entry[jj].messaging;
         for (var i = 0; i < messaging_events.length; i++) {
-            console.log(event);
             var myEvent = req.body.entry[jj].messaging[i];
+            // console.log(myEvent)
 
             var event = JSON.parse(JSON.stringify(myEvent));
+
+            var payload = '';
+            console.log(event);
+
+
+            var tools = new Tools(FB_ACCESS_TOKEN, event);
+
+          //  var payload = '';
+
 
             var user = {};
                 user.senderId = event.sender.id;
                 user.recipientId = event.recipient.id;
 
-            if(event.message && event.message.quick_reply && event.message.quick_reply.payload) {
-              console.log("ss");
-              var payload = event.message.quick_reply.payload;
+            if(event.message && event.message.postback && event.message.postback.payload) {
+              payload = event.message.postback.payload;
+            } else if(event.message && event.message.quick_reply && event.message.quick_reply.payload) {
+              payload = event.message.quick_reply.payload;
+            }
 
-              if(triggerPayload[payload]) {
-                triggerPayload[payload](event);
-              }
+            try {
+              var msgType = tools.event.message.attachments[0].type === "image";
+              var imgUrl = tools.event.message.attachments[0].payload.url;
+              return ConvertUrlIntoBase64(imageUrl, afterImageSend);
+            } catch(e) {
+              // console.log("this is not a img")
+            }
+
+            if(triggerPayload[payload]) {
+              triggerPayload[payload](tools);
             } else {
-              console.log("def");
-              triggerPayload['default'](event);
+              triggerPayload['default'](tools);
             }
 
 
@@ -145,9 +207,6 @@ app.post('/webhook', function(req, res) {
 
     res.sendStatus(200);
 })
-var a = new tools(FB_ACCESS_TOKEN, event);
-a.
-
 
 app.listen(port, function() {
     console.log('Our app is running on http://localhost:' + port);
